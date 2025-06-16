@@ -1,0 +1,165 @@
+import array
+import time
+import os
+
+class PilhaCheiaErro(Exception):
+    pass
+
+class PilhaVaziaErro(Exception):
+    pass
+
+class TipoErro(Exception):
+    pass
+
+class Pilha:
+    def __init__(self, capacidade_maxima, tipo_dado='u'):
+        if not isinstance(capacidade_maxima, int) or capacidade_maxima <= 0:
+            raise ValueError("Capacidade máxima deve ser um inteiro positivo.")
+        
+        self.capacidade = capacidade_maxima
+        self.elementos = array.array(tipo_dado)
+        self.tipo_armazenado = tipo_dado
+        self.topo = -1
+
+    def empilha(self, dado):
+        if self.tipo_armazenado == 'u' and not isinstance(dado, str) or \
+           self.tipo_armazenado == 'i' and not isinstance(dado, int):
+            raise TipoErro(f"Tipo de dado '{type(dado).__name__}' incompatível com o tipo da pilha '{self.tipo_armazenado}'")
+
+        if self.pilha_esta_cheia():
+            raise PilhaCheiaErro("Não é possível empilhar, a pilha está cheia.")
+        
+        self.elementos.append(dado)
+        self.topo += 1
+        
+    def desempilha(self):
+        if self.pilha_esta_vazia():
+            raise PilhaVaziaErro("Não é possível desempilhar, a pilha está vazia.")
+        
+        dado = self.elementos.pop()
+        self.topo -= 1
+        return dado
+
+    def pilha_esta_vazia(self):
+        return self.topo == -1
+
+    def pilha_esta_cheia(self):
+        return self.topo == (self.capacidade - 1)
+
+    def tamanho(self):
+        return self.topo + 1
+
+    def troca(self):
+        if self.tamanho() < 2:
+            raise PilhaVaziaErro("Não é possível trocar, a pilha precisa de pelo menos dois elementos.")
+        
+        primeiro_topo = self.desempilha()
+        segundo_topo = self.desempilha()
+        
+        self.empilha(primeiro_topo)
+        self.empilha(segundo_topo)
+
+def ler_matriz_de_arquivo(nome_arquivo):
+    matriz = []
+    try:
+        with open(nome_arquivo, 'r') as f:
+            for linha in f:
+                matriz.append(list(linha.strip()))
+        return matriz
+    except FileNotFoundError:
+        print(f"Erro: Arquivo '{nome_arquivo}' não encontrado.")
+        return None
+
+def imprimir_matriz(matriz, passo_atual=None):
+    os.system('cls' if os.name == 'nt' else 'clear')
+    if passo_atual is not None:
+        print(f"--- Passo: {passo_atual} ---")
+    
+    for linha in matriz:
+        linha_formatada = ""
+        for char in linha:
+            if char == '1':
+                linha_formatada += ' '
+            elif char == '0':
+                linha_formatada += '#'
+            else:
+                linha_formatada += char 
+        print("".join(linha_formatada))
+    print("-" * len(matriz[0]))
+
+def preencher_regiao_com_pilha(matriz, linha_inicial, coluna_inicial, passos_entre_apresentacao=0):
+    num_linhas = len(matriz)
+    num_colunas = len(matriz[0]) if num_linhas > 0 else 0
+
+    if not (0 <= linha_inicial < num_linhas and 0 <= coluna_inicial < num_colunas):
+        print("Erro: Posição inicial fora dos limites da matriz.")
+        return
+
+    capacidade_pilha = num_linhas * num_colunas 
+    pilha_posicoes = Pilha(capacidade_pilha, 'u')
+
+    if matriz[linha_inicial][coluna_inicial] == '0':
+        print(f"A posição inicial ({linha_inicial}, {coluna_inicial}) já é '0'. Nada a preencher.")
+        return
+    
+    matriz[linha_inicial][coluna_inicial] = 'X' 
+    imprimir_matriz(matriz, 0)
+    input("Pressione [ENTER] para iniciar o preenchimento...")
+
+    pilha_posicoes.empilha(f"{linha_inicial},{coluna_inicial}")
+    passos_executados = 0
+
+    while not pilha_posicoes.pilha_esta_vazia():
+        pos_str = pilha_posicoes.desempilha()
+        r, c = map(int, pos_str.split(','))
+
+        if matriz[r][c] == '1' or matriz[r][c] == 'X':
+            matriz[r][c] = '0'
+            passos_executados += 1
+
+            if passos_entre_apresentacao > 0 and passos_executados % passos_entre_apresentacao == 0:
+                imprimir_matriz(matriz, passos_executados)
+                input("Pressione [ENTER] para continuar...")
+
+            vizinhos = [
+                (r - 1, c), 
+                (r + 1, c), 
+                (r, c - 1), 
+                (r, c + 1)  
+            ]
+
+            for nr, nc in vizinhos:
+                if 0 <= nr < num_linhas and 0 <= nc < num_colunas and \
+                   matriz[nr][nc] == '1':
+                    pilha_posicoes.empilha(f"{nr},{nc}")
+
+    imprimir_matriz(matriz, passos_executados)
+    print("\nPreenchimento concluído!")
+
+if __name__ == "__main__":
+    nome_arquivo = "matriz_exemplo.txt"
+
+    matriz = ler_matriz_de_arquivo(nome_arquivo)
+
+    if matriz:
+        print("--- Matriz Original ---")
+        imprimir_matriz(matriz)
+        
+        linha_inicio = 6
+        coluna_inicio = 3
+
+        try:
+            passos_input = input("Quantos passos entre cada apresentação da matriz (0 para sem pausas): ")
+            passos_vis = int(passos_input)
+            
+            preencher_regiao_com_pilha(matriz, linha_inicio, coluna_inicio, passos_vis)
+
+        except ValueError:
+            print("Entrada inválida para passos. Usando 0 (sem pausas).")
+            preencher_regiao_com_pilha(matriz, linha_inicio, coluna_inicio, 0)
+        except PilhaCheiaErro as e:
+            print(f"Erro na pilha: {e}")
+        except PilhaVaziaErro as e:
+            print(f"Erro na pilha: {e}")
+        except TipoErro as e:
+            print(f"Erro de tipo: {e}")

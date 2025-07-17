@@ -1,0 +1,86 @@
+import csv
+
+# Cria um CSV de teste no Colab
+with open('alunos.csv', 'w', newline='') as f:
+    writer = csv.writer(f)
+    writer.writerow(['ID', 'Nome', 'Idade'])
+    writer.writerow([3, 'Ana', 20])
+    writer.writerow([1, 'Bruno', 22])
+    writer.writerow([2, 'Carlos', 21])
+    writer.writerow([5, 'Diana', 19])
+    writer.writerow([4, 'Eduardo', 23])
+
+print('Arquivo alunos.csv criado!')
+import csv
+import os
+import heapq
+
+MAX_LINES_IN_MEMORY = 2  # Forçar divisão em vários runs para teste
+
+def merge_sort_external(input_file, key_column_index, ascending=True):
+    run_files = create_initial_runs(input_file, key_column_index, ascending)
+    output_file = 'sorted_output.csv'
+    merge_runs(run_files, key_column_index, ascending, output_file)
+    for f in run_files:
+        os.remove(f)
+    print(f"Ordenação concluída! Arquivo final: {output_file}")
+
+def create_initial_runs(input_file, key_column_index, ascending):
+    run_files = []
+    with open(input_file, 'r', newline='') as csvfile:
+        reader = csv.reader(csvfile)
+        headers = next(reader)
+        chunk = []
+        run_index = 0
+        for row in reader:
+            chunk.append(row)
+            if len(chunk) >= MAX_LINES_IN_MEMORY:
+                chunk.sort(key=lambda x: int(x[key_column_index]), reverse=not ascending)
+                run_filename = f'run_{run_index}.csv'
+                with open(run_filename, 'w', newline='') as runfile:
+                    writer = csv.writer(runfile)
+                    writer.writerow(headers)
+                    writer.writerows(chunk)
+                run_files.append(run_filename)
+                chunk = []
+                run_index += 1
+        if chunk:
+            chunk.sort(key=lambda x: int(x[key_column_index]), reverse=not ascending)
+            run_filename = f'run_{run_index}.csv'
+            with open(run_filename, 'w', newline='') as runfile:
+                writer = csv.writer(runfile)
+                writer.writerow(headers)
+                writer.writerows(chunk)
+            run_files.append(run_filename)
+    return run_files
+
+def merge_runs(run_files, key_column_index, ascending, output_file):
+    open_files = [open(f, 'r', newline='') for f in run_files]
+    readers = [csv.reader(f) for f in open_files]
+    headers = next(readers[0])
+    for r in readers[1:]:
+        next(r)
+    with open(output_file, 'w', newline='') as outfile:
+        writer = csv.writer(outfile)
+        writer.writerow(headers)
+        heap = []
+        for i, reader in enumerate(readers):
+            try:
+                row = next(reader)
+                key = int(row[key_column_index])
+                heapq.heappush(heap, (key, i, row))
+            except StopIteration:
+                pass
+        while heap:
+            key, file_index, row = heapq.heappop(heap)
+            writer.writerow(row)
+            try:
+                next_row = next(readers[file_index])
+                next_key = int(next_row[key_column_index])
+                heapq.heappush(heap, (next_key, file_index, next_row))
+            except StopIteration:
+                pass
+    for f in open_files:
+        f.close()
+#chamandoa  função para teste .
+merge_sort_external('alunos.csv', key_column_index=0, ascending=True)
